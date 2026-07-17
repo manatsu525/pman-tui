@@ -11,7 +11,7 @@ trap cleanup EXIT HUP INT TERM
 
 fake_binary="$TEST_ROOT/source/pman"
 mkdir -p "$(dirname -- "$fake_binary")"
-printf '%s\n' '#!/bin/sh' 'test "${1:-}" = "--version" && echo "pman 1.1.2"' >"$fake_binary"
+printf '%s\n' '#!/bin/sh' 'test "${1:-}" = "--version" && echo "pman 1.1.3"' >"$fake_binary"
 chmod 0755 "$fake_binary"
 sha256sum "$fake_binary" >"$fake_binary.sha256"
 
@@ -22,7 +22,7 @@ PMAN_CHECKSUM_SOURCE="$fake_binary.sha256" \
 PMAN_UNINSTALL_SOURCE="$ROOT/uninstall.sh" \
 sh "$ROOT/install.sh"
 
-"$TEST_ROOT/bin/pman" --version | grep -q '^pman 1\.1\.2$'
+"$TEST_ROOT/bin/pman" --version | grep -q '^pman 1\.1\.3$'
 test -x "$TEST_ROOT/share/uninstall.sh"
 test -f "$TEST_ROOT/share/install-manifest"
 printf '%s\n' "pre-existing reptyr" >"$TEST_ROOT/bin/reptyr"

@@ -81,6 +81,61 @@ def main() -> int:
     ui_shell_fd = None
     external_process = None
     try:
+        # A TUI/client upgrade must keep using an older daemon when its protocol
+        # is compatible. The daemon owns active PTY masters, so replacing it
+        # would either reject the reopen or disrupt adopted jobs.
+        compatible_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        compatible_path = temp / "pman.sock"
+        compatible_socket.bind(str(compatible_path))
+        compatible_socket.listen(4)
+        fake_helper = temp / "reptyr"
+        fake_helper.write_text("#!/bin/sh\nexit 0\n")
+        fake_helper.chmod(0o755)
+        original_path = env.get("PATH", "")
+        env["PATH"] = f"{temp}:{original_path}"
+        compatible_task = {
+            "id": "d2e4d833",
+            "status": "running",
+            "pid": 4242,
+            "name": "adopted-job",
+            "command": "sleep 30",
+            "log_path": str(temp / "logs" / "d2e4d833.log"),
+        }
+
+        def serve_compatible_daemon() -> None:
+            for _ in range(4):
+                client, _ = compatible_socket.accept()
+                line = bytearray()
+                while b"\n" not in line:
+                    line.extend(client.recv(4096))
+                command = json.loads(bytes(line).partition(b"\n")[0]).get("cmd")
+                if command == "ping":
+                    reply = {
+                        "ok": True,
+                        "pid": os.getpid(),
+                        "protocol": 3,
+                        "build": "1.1.1",
+                        "reptyr": "/embedded/reptyr",
+                    }
+                elif command == "list":
+                    reply = {"ok": True, "tasks": [compatible_task]}
+                elif command == "adopt":
+                    reply = {"ok": True, "task": compatible_task}
+                else:
+                    reply = {"ok": False, "error": f"unexpected command: {command}"}
+                client.sendall((json.dumps(reply) + "\n").encode())
+                client.close()
+            compatible_socket.close()
+            compatible_path.unlink()
+
+        compatible_thread = threading.Thread(target=serve_compatible_daemon, daemon=True)
+        compatible_thread.start()
+        assert json.loads(call(env, "list", "--json").stdout) == [compatible_task]
+        assert "d2e4d833" in call(env, "adopt", "4242").stdout
+        compatible_thread.join(timeout=3)
+        assert not compatible_thread.is_alive()
+        env["PATH"] = original_path
+
         # Emulate a pre-version-handshake daemon. The new client must detect it,
         # confirm there are no active tasks, shut it down, and start protocol 3.
         legacy_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
