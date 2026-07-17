@@ -29,7 +29,7 @@ from typing import Any
 
 
 APP = "pman"
-VERSION = "1.1.1"
+VERSION = "1.1.2"
 PROTOCOL_VERSION = 3
 DETACH_KEY = b"\x1d"  # Ctrl-]
 PAUSE_KEY = b"\x1a"  # Ctrl-Z
@@ -810,14 +810,14 @@ def daemon_alive() -> bool:
     return daemon_info() is not None
 
 
-def ensure_daemon() -> None:
+def ensure_daemon(require_helper: bool = False) -> None:
     info = daemon_info()
     client_has_helper = bool(reptyr_binary())
     daemon_matches = bool(
         info
         and info.get("protocol") == PROTOCOL_VERSION
         and info.get("build") == VERSION
-        and (not client_has_helper or info.get("reptyr"))
+        and (not require_helper or not client_has_helper or info.get("reptyr"))
     )
     if daemon_matches:
         return
@@ -872,9 +872,9 @@ def ensure_daemon() -> None:
     raise RuntimeError(f"could not start daemon; see {home / 'daemon.log'}")
 
 
-def request(payload: dict[str, Any], start: bool = True) -> dict[str, Any]:
+def request(payload: dict[str, Any], start: bool = True, require_helper: bool = False) -> dict[str, Any]:
     if start:
-        ensure_daemon()
+        ensure_daemon(require_helper=require_helper)
     return raw_request(payload)
 
 
@@ -1357,7 +1357,10 @@ def tui(stdscr: Any, shell_pid: int) -> None:
                 message = "cannot adopt: process has no accessible controlling TTY"
             else:
                 try:
-                    result = request({"cmd": "adopt", "pid": task["pid"], "name": task["name"]})["task"]
+                    result = request(
+                        {"cmd": "adopt", "pid": task["pid"], "name": task["name"]},
+                        require_helper=True,
+                    )["task"]
                     message = f"adopted {task['pid']} as {result['id']} -> {result['log_path']}"
                     selected_token = result["id"]
                 except Exception as exc:
@@ -1369,7 +1372,10 @@ def tui(stdscr: Any, shell_pid: int) -> None:
                     message = "process must have an accessible TTY before it can be attached"
                     continue
                 try:
-                    task = request({"cmd": "adopt", "pid": task["pid"], "name": task["name"]})["task"]
+                    task = request(
+                        {"cmd": "adopt", "pid": task["pid"], "name": task["name"]},
+                        require_helper=True,
+                    )["task"]
                 except Exception as exc:
                     message = str(exc)
                     continue
@@ -1412,7 +1418,10 @@ def tui(stdscr: Any, shell_pid: int) -> None:
                 try:
                     path = str(Path(value).expanduser().resolve())
                     if task.get("external"):
-                        result = request({"cmd": "adopt", "pid": task["pid"], "name": task["name"], "log_path": path})["task"]
+                        result = request(
+                            {"cmd": "adopt", "pid": task["pid"], "name": task["name"], "log_path": path},
+                            require_helper=True,
+                        )["task"]
                         message = f"adopted {task['pid']} as {result['id']} -> {path}"
                     else:
                         request({"cmd": "set_log", "id": task["id"], "path": path})
@@ -1569,7 +1578,7 @@ def main(argv: list[str] | None = None) -> int:
                 "name": args.name,
                 "log_path": str(Path(args.log).expanduser().resolve()) if args.log else None,
             }
-            task = request(payload)["task"]
+            task = request(payload, require_helper=True)["task"]
             print(f"started {task['id']} pid={task['pid']} log={task['log_path']}")
             if args.attach:
                 attach(task["id"])
