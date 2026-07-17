@@ -29,7 +29,7 @@ from typing import Any
 
 
 APP = "pman"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 PROTOCOL_VERSION = 3
 DETACH_KEY = b"\x1d"  # Ctrl-]
 PAUSE_KEY = b"\x1a"  # Ctrl-Z
