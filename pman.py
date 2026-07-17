@@ -50,6 +50,29 @@ PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
 USER_NAMES: dict[int, str] = {}
 
 
+def bundled_resource(name: str) -> Path | None:
+    """Return a resource embedded by a one-file PyInstaller build, if present."""
+    if not getattr(sys, "frozen", False):
+        return None
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if not bundle_root:
+        return None
+    resource = Path(bundle_root) / "helpers" / name
+    if not resource.is_file():
+        return None
+    try:
+        resource.chmod(0o700)
+    except OSError:
+        pass
+    return resource
+
+
+def reptyr_binary() -> str | None:
+    """Prefer the reptyr helper embedded in a standalone binary."""
+    embedded = bundled_resource("reptyr")
+    return str(embedded) if embedded else shutil.which("reptyr")
+
+
 def paths() -> tuple[Path, Path, Path, Path]:
     override = os.environ.get("PMAN_HOME")
     if override:
@@ -251,7 +274,10 @@ class PmanDaemon:
             except OSError:
                 raise SystemExit(f"cannot remove stale socket: {self.sock_path}")
         self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.server.bind(str(self.sock_path))
+        try:
+            self.server.bind(str(self.sock_path))
+        except OSError as exc:
+            raise SystemExit(f"cannot bind socket {self.sock_path}: {exc}")
         os.chmod(self.sock_path, 0o600)
         self.server.listen(32)
         self.server.setblocking(False)
@@ -453,7 +479,7 @@ class PmanDaemon:
         return task
 
     def _adopt_task(self, req: dict[str, Any]) -> dict[str, Any]:
-        reptyr = shutil.which("reptyr")
+        reptyr = reptyr_binary()
         if not reptyr:
             raise RuntimeError("reptyr is required (Debian/Ubuntu: apt install reptyr)")
         try:
@@ -808,8 +834,13 @@ def ensure_daemon() -> None:
         except OSError:
             pass
     daemon_log = open(home / "daemon.log", "ab", buffering=0)
+    daemon_command = [sys.executable, "_daemon"] if getattr(sys, "frozen", False) else [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "_daemon",
+    ]
     subprocess.Popen(
-        [sys.executable, str(Path(__file__).resolve()), "_daemon"],
+        daemon_command,
         stdin=subprocess.DEVNULL,
         stdout=daemon_log,
         stderr=daemon_log,
@@ -1491,7 +1522,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"daemon: running (protocol {info.get('protocol', 'legacy')}, client {PROTOCOL_VERSION})")
             else:
                 print(f"daemon: stopped (client protocol {PROTOCOL_VERSION})")
-            print(f"reptyr: {shutil.which('reptyr') or 'not installed'}")
+            print(f"reptyr: {reptyr_binary() or 'not installed'}")
             try:
                 ptrace_scope = Path("/proc/sys/kernel/yama/ptrace_scope").read_text().strip()
             except OSError:
