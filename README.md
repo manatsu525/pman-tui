@@ -46,13 +46,13 @@ Linux 没有普通 API 能直接替换任意进程已经打开的 `stdout`/`stde
 在 Debian/Ubuntu、Fedora/RHEL、Alpine、Arch 和 openSUSE 上可以一条命令安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/install.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/install.sh | sh
 ```
 
 服务器只有 `wget` 时：
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/manatsu525/pman-tui/main/install.sh | sudo sh
+wget -qO- https://raw.githubusercontent.com/manatsu525/pman-tui/main/install.sh | sh
 ```
 
 安装器会：
@@ -67,7 +67,7 @@ wget -qO- https://raw.githubusercontent.com/manatsu525/pman-tui/main/install.sh 
 或把 `install.sh` 复制到服务器后执行：
 
 ```bash
-sudo sh install.sh
+sh install.sh
 ```
 
 安装完成后运行：
@@ -79,7 +79,7 @@ pman
 自定义安装目录（默认值通常已经在 `PATH` 中）：
 
 ```bash
-sudo PMAN_INSTALL_DIR=/opt/pman/bin PMAN_SHARE_DIR=/opt/pman/share sh install.sh
+PMAN_INSTALL_DIR=/opt/pman/bin PMAN_SHARE_DIR=/opt/pman/share sh install.sh
 ```
 
 ### 一键卸载
@@ -87,13 +87,13 @@ sudo PMAN_INSTALL_DIR=/opt/pman/bin PMAN_SHARE_DIR=/opt/pman/share sh install.sh
 删除程序但保留任务记录和日志：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/uninstall.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/uninstall.sh | sh
 ```
 
-同时删除执行 `sudo` 的用户在 `~/.local/state/pman` 下的记录和日志：
+同时删除当前 root 用户在 `~/.local/state/pman` 下的记录和日志：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/uninstall.sh | sudo sh -s -- --purge
+curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/uninstall.sh | sh -s -- --purge
 ```
 
 卸载不会终止正在运行的任务。如果安装器曾从源码编译专用的 `reptyr`，卸载器会删除
