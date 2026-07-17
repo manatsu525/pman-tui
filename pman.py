@@ -29,7 +29,7 @@ from typing import Any
 
 
 APP = "pman"
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 PROTOCOL_VERSION = 3
 DETACH_KEY = b"\x1d"  # Ctrl-]
 PAUSE_KEY = b"\x1a"  # Ctrl-Z
@@ -357,13 +357,22 @@ class PmanDaemon:
     def _dispatch(self, client: socket.socket, req: dict[str, Any]) -> None:
         cmd = req.get("cmd")
         if cmd == "ping":
+            helper = reptyr_binary()
             self._reply(
                 client,
                 {
                     "ok": True,
                     "pid": os.getpid(),
                     "protocol": PROTOCOL_VERSION,
-                    "features": ["adopt", "process-scan", "external-signals", "three-views"],
+                    "build": VERSION,
+                    "reptyr": helper,
+                    "features": [
+                        "adopt",
+                        "process-scan",
+                        "external-signals",
+                        "three-views",
+                        *(["embedded-reptyr"] if bundled_resource("reptyr") else []),
+                    ],
                 },
                 close=True,
             )
@@ -803,7 +812,14 @@ def daemon_alive() -> bool:
 
 def ensure_daemon() -> None:
     info = daemon_info()
-    if info and info.get("protocol") == PROTOCOL_VERSION:
+    client_has_helper = bool(reptyr_binary())
+    daemon_matches = bool(
+        info
+        and info.get("protocol") == PROTOCOL_VERSION
+        and info.get("build") == VERSION
+        and (not client_has_helper or info.get("reptyr"))
+    )
+    if daemon_matches:
         return
     if info:
         # A daemon owns live PTY masters, so killing an old daemon with active
@@ -817,7 +833,7 @@ def ensure_daemon() -> None:
         if active:
             ids = ", ".join(str(task.get("id", "?")) for task in active[:5])
             raise RuntimeError(
-                f"old pman daemon protocol {info.get('protocol', 1)} has active jobs ({ids}); "
+                f"old pman daemon build {info.get('build', 'legacy')} has active jobs ({ids}); "
                 "finish/stop them with the old daemon, then reopen pman"
             )
         try:
@@ -1519,7 +1535,10 @@ def main(argv: list[str] | None = None) -> int:
             home, sock_path, state_path, logs_dir = prepare_paths()
             info = daemon_info()
             if info:
-                print(f"daemon: running (protocol {info.get('protocol', 'legacy')}, client {PROTOCOL_VERSION})")
+                print(
+                    f"daemon: running (build {info.get('build', 'legacy')}, "
+                    f"protocol {info.get('protocol', 'legacy')}, client {PROTOCOL_VERSION})"
+                )
             else:
                 print(f"daemon: stopped (client protocol {PROTOCOL_VERSION})")
             print(f"reptyr: {reptyr_binary() or 'not installed'}")
