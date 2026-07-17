@@ -43,7 +43,7 @@ Linux 没有普通 API 能直接替换任意进程已经打开的 `stdout`/`stde
 
 ## 安装
 
-在 Debian/Ubuntu、Fedora/RHEL、Alpine、Arch 和 openSUSE 上可以一条命令安装：
+在 amd64 的 Debian/Ubuntu、Fedora/RHEL 等 glibc Linux VPS 上可以一条命令安装：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/install.sh | sh
@@ -55,16 +55,10 @@ curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/install.sh
 wget -qO- https://raw.githubusercontent.com/manatsu525/pman-tui/main/install.sh | sh
 ```
 
-安装器会：
-
-- 自动识别 `apt`、`dnf`、`yum`、`apk`、`pacman` 或 `zypper`；
-- 安装 Python 3、curses、证书、下载工具及 `reptyr`；
-- 如果软件源没有 `reptyr`，下载、校验并编译固定的 `reptyr 0.10.0`；
-- 将 `pman` 安装到 `/usr/local/bin/pman` 并执行基本自检。
-
-因此目标机器不需要预装 Python、Git、编译器或项目运行环境。远程一行命令本身需要
-机器上已有 `curl` 或 `wget` 之一；如果两者都没有，先用系统包管理器安装 `curl`，
-或把 `install.sh` 复制到服务器后执行：
+安装器会从 GitHub Release 下载对应的独立二进制，校验 SHA256 后安装到
+`/usr/local/bin/pman`。目标机器不需要 Python、curses、`reptyr`、Git、编译器或包管理器。
+远程一行命令本身需要机器上已有 `curl` 或 `wget` 之一；如果两者都没有，先准备一个
+下载工具，或把二进制和 `uninstall.sh` 复制到服务器后执行。
 
 ```bash
 sh install.sh
@@ -96,8 +90,31 @@ curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/uninstall.
 curl -fsSL https://raw.githubusercontent.com/manatsu525/pman-tui/main/uninstall.sh | sh -s -- --purge
 ```
 
-卸载不会终止正在运行的任务。如果安装器曾从源码编译专用的 `reptyr`，卸载器会删除
-这份副本；系统包管理器提供或安装前已经存在的 `reptyr` 不会被删除。
+卸载不会终止正在运行的任务；二进制内置的 `reptyr` 也不会影响系统已有的 `reptyr`。
+
+### 独立二进制部署
+
+如果 Release 中没有你的架构，或你想自行构建，可以在一台构建机上生成单文件 Linux
+二进制。二进制会内置 Python 运行时、curses 模块和 `reptyr` helper；目标机只需要
+Linux 内核提供 `/proc`、PTY、ptrace，以及兼容的 glibc。
+
+构建机需要 Python 3、PyInstaller、编译器和 `reptyr`：
+
+```bash
+python3 -m pip install pyinstaller
+REPTYR_PATH=$(command -v reptyr) ./packaging/build-binary.sh
+```
+
+产物位于 `dist/pman-linux-amd64`、`dist/pman-linux-arm64` 或 `dist/pman-linux-armv7`，复制到目标机后即可直接
+运行：
+
+```bash
+install -m 0755 dist/pman-linux-amd64 /usr/local/bin/pman
+pman doctor
+```
+
+二进制必须按 CPU 架构分别构建；当前脚本支持 amd64、arm64 和 armv7。单文件启动时会
+把内置 helper 解压到临时目录，因此目标机的临时目录必须允许执行文件。
 
 ## TUI 操作
 

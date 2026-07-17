@@ -9,6 +9,7 @@ import pty
 import select
 import signal
 import shutil
+import shlex
 import socket
 import subprocess
 import sys
@@ -19,12 +20,18 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PMAN = ROOT / "pman.py"
+PMAN = Path(os.environ.get("PMAN_BIN", str(ROOT / "pman.py"))).expanduser().resolve()
+
+
+def pman_command(*args: str) -> list[str]:
+    if PMAN.suffix == ".py":
+        return [sys.executable, str(PMAN), *args]
+    return [str(PMAN), *args]
 
 
 def call(env: dict[str, str], *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(PMAN), *args],
+        pman_command(*args),
         env=env,
         text=True,
         stdout=subprocess.PIPE,
@@ -121,7 +128,7 @@ def main() -> int:
             sys.executable,
             "-u",
             "-c",
-            "import time; [(print(f'tick {i}', flush=True), time.sleep(.15)) for i in range(20)]",
+            "import time; [(print(f'tick {i}', flush=True), time.sleep(.05)) for i in range(100)]",
         )
         task_id = started.stdout.split()[1]
         wait_until(lambda: any(t["id"] == task_id for t in tasks(env)))
@@ -132,17 +139,17 @@ def main() -> int:
         assert next(t for t in tasks(env) if t["id"] == task_id)["status"] == "running"
 
         redirected = temp / "redirected.log"
-        time.sleep(0.35)
+        default_log = temp / "logs" / f"{task_id}.log"
+        wait_until(lambda: default_log.exists() and "tick" in default_log.read_text())
         call(env, "redirect", task_id, str(redirected))
         wait_until(lambda: next(t for t in tasks(env) if t["id"] == task_id)["status"] == "exited")
 
         task = next(t for t in tasks(env) if t["id"] == task_id)
         assert task["exit_code"] == 0, task
-        default_log = next((temp / "logs").glob("*.log"))
         assert "tick" in default_log.read_text(), "initial log is empty"
         redirected_text = redirected.read_text()
         assert "tick" in redirected_text, "redirected log is empty"
-        assert "tick 19" in redirected_text, "final output did not reach redirected log"
+        assert "tick 99" in redirected_text, "final output did not reach redirected log"
 
         long_job = call(env, "run", "-n", "sleeper", "--", "sleep", "30")
         long_id = long_job.stdout.split()[1]
@@ -186,7 +193,8 @@ def main() -> int:
             os.execvpe("bash", ["bash", "--noprofile", "--norc", "-i"], env)
         os.set_blocking(ui_shell_fd, False)
         drain_pty(ui_shell_fd)
-        os.write(ui_shell_fd, f"{sys.executable} {PMAN} tui\n".encode())
+        ui_command = " ".join(shlex.quote(part) for part in pman_command("tui"))
+        os.write(ui_shell_fd, f"{ui_command}\n".encode())
         time.sleep(0.6)
         os.write(ui_shell_fd, b"/")
         time.sleep(0.15)
@@ -222,7 +230,7 @@ def main() -> int:
         tui_env = env.copy()
         tui_env.setdefault("TERM", "xterm-256color")
         tui_process = subprocess.Popen(
-            [sys.executable, str(PMAN), "tui"],
+            pman_command("tui"),
             env=tui_env,
             stdin=slave,
             stdout=slave,
