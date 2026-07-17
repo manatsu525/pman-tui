@@ -2,7 +2,7 @@
 set -eu
 
 REPO="${PMAN_REPO:-manatsu525/pman-tui}"
-RELEASE_TAG="${PMAN_RELEASE_TAG:-v1.1.0}"
+RELEASE_TAG="${PMAN_RELEASE_TAG:-v1.1.1}"
 INSTALL_DIR="${PMAN_INSTALL_DIR:-/usr/local/bin}"
 SHARE_DIR="${PMAN_SHARE_DIR:-/usr/local/share/pman}"
 DOWNLOAD_BASE="https://github.com/${REPO}/releases/download/${RELEASE_TAG}"
