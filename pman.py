@@ -29,7 +29,7 @@ from typing import Any
 
 
 APP = "pman"
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 PROTOCOL_VERSION = 3
 DETACH_KEY = b"\x1d"  # Ctrl-]
 PAUSE_KEY = b"\x1a"  # Ctrl-Z
@@ -816,7 +816,6 @@ def ensure_daemon(require_helper: bool = False) -> None:
     daemon_matches = bool(
         info
         and info.get("protocol") == PROTOCOL_VERSION
-        and info.get("build") == VERSION
         and (not require_helper or not client_has_helper or info.get("reptyr"))
     )
     if daemon_matches:
@@ -1578,7 +1577,7 @@ def main(argv: list[str] | None = None) -> int:
                 "name": args.name,
                 "log_path": str(Path(args.log).expanduser().resolve()) if args.log else None,
             }
-            task = request(payload, require_helper=True)["task"]
+            task = request(payload)["task"]
             print(f"started {task['id']} pid={task['pid']} log={task['log_path']}")
             if args.attach:
                 attach(task["id"])
@@ -1590,7 +1589,7 @@ def main(argv: list[str] | None = None) -> int:
                 "name": args.name,
                 "log_path": str(Path(args.log).expanduser().resolve()) if args.log else None,
             }
-            task = request(payload)["task"]
+            task = request(payload, require_helper=True)["task"]
             print(f"adopted pid={args.pid} as {task['id']} log={task['log_path']}")
             if args.attach:
                 attach(task["id"])

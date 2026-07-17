@@ -68,7 +68,10 @@ PMAN_HOME="$smoke_home" "$binary" list --json >/dev/null
 PMAN_HOME="$smoke_home" "$binary" doctor | grep -q 'reptyr:'
 
 if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$binary" >"$binary.sha256"
+    (
+        cd "$DIST_DIR"
+        sha256sum "$(basename "$binary")" >"$(basename "$binary").sha256"
+    )
 fi
 cp "$ROOT/packaging/THIRD_PARTY_LICENSES.md" "$binary.licenses.md"
 printf '%s\n' "[pman-build] generated $binary"
